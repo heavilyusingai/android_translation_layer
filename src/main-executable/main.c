@@ -273,6 +273,7 @@ static gboolean on_drop(GtkDropTarget *target, const GValue *value, double x, do
 	jobject activity = J__Context__resolveActivityInternal(env, intent);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
 	if (!activity) {
 		fprintf(stderr, "failed to resolve activity to handle URI: %s\n", data);
@@ -345,8 +346,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		jobject activity = J__Activity__createMainActivity(env,
 		                                                   _JSTRING(d->apk_main_activity_class),
 		                                                   _INTPTR(window), _JSTRING(uri));
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		activity_start(env, activity);
 		return;
 	}
@@ -507,16 +510,22 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 	// construct Application
 	application_object = J__Context__createApplication(env, _INTPTR(window));
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	J__ContentProvider__createContentProviders(env);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	J__Application__onCreate(env, application_object);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (d->apk_instrumentation_class) {
 		if (d->apk_main_activity_class) {
@@ -533,16 +542,20 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 		J__Instrumentation__create(env, _JSTRING(d->apk_instrumentation_class), intent);
 
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 
 	// construct main Activity
 	if (!d->apk_instrumentation_class && !d->install_internal) {
 		activity_object = J__Activity__createMainActivity(env, _JSTRING(d->apk_main_activity_class),
 		                                                  _INTPTR(window), (uri_option && *uri_option) ? _JSTRING(uri_option) : NULL);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		if (uri_option)
 			g_free(uri_option);
 
@@ -557,14 +570,18 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	if (!d->apk_instrumentation_class) {
 		jstring package_name_jstr = J__Context__getPackageName(env, application_object);
 		package_name = package_name_jstr ? _CSTRING(package_name_jstr) : NULL;
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 
 	jstring app_icon_path_jstr = J__Application__get_app_icon_path(env, application_object);
 	const char *app_icon_path = app_icon_path_jstr ? _CSTRING(app_icon_path_jstr) : NULL;
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (d->install || d->install_internal) {
 		if (d->apk_instrumentation_class) {
@@ -575,8 +592,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		XdpPortal *portal = xdp_portal_new();
 
 		const char *app_label = _CSTRING(J__Application__get_app_label(env, application_object));
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 
 		GVariant *icon_serialized = NULL;
 		if (!d->install_internal) {
@@ -630,8 +649,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 		jstring supported_mime_types_jstr = J__Application__get_supported_mime_types(env, application_object);
 		const char *supported_mime_types = supported_mime_types_jstr ? _CSTRING(supported_mime_types_jstr) : NULL;
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 
 		GString *exec_cmd = g_string_new("env ");
 		if (getenv("RUN_FROM_BUILDDIR")) {
@@ -726,8 +747,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		jobject input_queue = g_object_get_data(G_OBJECT(window), "input_queue");
 
 		J__InputQueue__Callback__onInputQueueCreated(env, input_queue_callback, input_queue);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 
 	if (strcmp(app_id, "com.example.demo_application")) {

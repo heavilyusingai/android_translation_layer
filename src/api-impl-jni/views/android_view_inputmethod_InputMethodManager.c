@@ -12,19 +12,25 @@ static void commit_cb(GtkIMContext *context, gchar *str, gpointer user_data)
 {
 	JNIEnv *env = get_jni_env();
 	J__InputConnection__commitText(env, connection, _JSTRING(str), 1);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static void retrieve_surrounding_cb(GtkIMContext *context, gpointer user_data)
 {
 	JNIEnv *env = get_jni_env();
 	jobject before = J__InputConnection__getTextBeforeCursor(env, connection, 100, 0);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	jobject after = J__InputConnection__getTextAfterCursor(env, connection, 100, 0);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	jstring before_str = before ? J__CharSequence__toString(env, before) : NULL;
 	jstring after_str = after ? J__CharSequence__toString(env, after) : NULL;
 	const char *before_cstr = before_str ? (*env)->GetStringUTFChars(env, before_str, NULL) : "";
@@ -43,8 +49,10 @@ static void delete_surrounding_cb(GtkIMContext *context, gint offset, gint n_cha
 {
 	JNIEnv *env = get_jni_env();
 	J__InputConnection__deleteSurroundingText(env, connection, -offset, offset + n_chars);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 JNIEXPORT jlong JNICALL Java_android_view_inputmethod_InputMethodManager_nativeInit(JNIEnv *env, jclass class)

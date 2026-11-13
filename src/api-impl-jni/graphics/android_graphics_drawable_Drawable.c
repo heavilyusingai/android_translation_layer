@@ -25,8 +25,10 @@ static void java_paintable_snapshot(GdkPaintable *gdk_paintable, GdkSnapshot *sn
 	jobject canvas = J_new__GskCanvas(env, _INTPTR(snapshot));
 	J__Drawable__setBounds(env, paintable->drawable, 0, 0, (int)width, (int)height);
 	J__Drawable__draw(env, paintable->drawable, canvas);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static int java_paintable_get_intrinsic_width(GdkPaintable *gdk_paintable)

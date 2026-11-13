@@ -37,11 +37,15 @@ static void changed_cb(GtkEditable *self, jobject listener)
 	const char *text = gtk_editable_get_text(self);
 	jobject text_obj = J_new__SpannableStringBuilder(env, _JSTRING(text));
 	J__TextWatcher__onTextChanged(env, listener, text_obj, 0, 0, strlen(text));
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	J__TextWatcher__afterTextChanged(env, listener, text_obj);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 JNIEXPORT void JNICALL Java_android_widget_EditText_native_1addTextChangedListener(JNIEnv *env, jobject this, jlong widget_ptr, jobject listener)
@@ -81,8 +85,10 @@ static void on_activate(GtkText *gtk_text, struct changed_callback_data *d)
 
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, IME_ACTION_SEARCH, KEYCODE_ENTER, 0, 0);
 	J__TextView__OnEditorActionListener__onEditorAction(env, d->listener, d->this, 0, key_event);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setOnEditorActionListener(JNIEnv *env, jobject this, jlong widget_ptr, jobject listener)

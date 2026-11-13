@@ -23,8 +23,10 @@ static void on_network_changed(GNetworkMonitor *self, gboolean network_available
 	} else {
 		J__ConnectivityManager__NetworkCallback__onLost(env, callback, NULL);
 	}
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 JNIEXPORT void JNICALL Java_android_net_ConnectivityManager_registerNetworkCallback(JNIEnv *env, jobject this, jobject request, jobject callback)
