@@ -638,17 +638,58 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 		super.setLayoutDirection(layoutDirection);
 	}*/
 
-	public void setLayerWidth(int index, int width) {}
+	public void setLayerWidth(int index, int width) {
+		if (mLayerState != null && mLayerState.mChildren != null && index >= 0 && index < mLayerState.mNum) {
+			mLayerState.mChildren[index].mWidth = width;
+		}
+	}
 
-	public void setLayerHeight(int index, int height) {}
+	public int getLayerWidth(int index) {
+		if (mLayerState != null && mLayerState.mChildren != null && index >= 0 && index < mLayerState.mNum) {
+			return mLayerState.mChildren[index].mWidth;
+		}
+		return -1;
+	}
 
-	public void setLayerGravity(int index, int gravity) {}
+	public void setLayerHeight(int index, int height) {
+		if (mLayerState != null && mLayerState.mChildren != null && index >= 0 && index < mLayerState.mNum) {
+			mLayerState.mChildren[index].mHeight = height;
+		}
+	}
+
+	public int getLayerHeight(int index) {
+		if (mLayerState != null && mLayerState.mChildren != null && index >= 0 && index < mLayerState.mNum) {
+			return mLayerState.mChildren[index].mHeight;
+		}
+		return -1;
+	}
+
+	public void setLayerSize(int index, int w, int h) {
+		setLayerWidth(index, w);
+		setLayerHeight(index, h);
+	}
+
+	public void setLayerGravity(int index, int gravity) {
+		if (mLayerState != null && mLayerState.mChildren != null && index >= 0 && index < mLayerState.mNum) {
+			mLayerState.mChildren[index].mGravity = gravity;
+		}
+	}
+
+	public int getLayerGravity(int index) {
+		if (mLayerState != null && mLayerState.mChildren != null && index >= 0 && index < mLayerState.mNum) {
+			return mLayerState.mChildren[index].mGravity;
+		}
+		return 0;
+	}
 
 	public void setPaddingMode(int paddingMode) {}
 
 	static class ChildDrawable {
 		public Drawable mDrawable;
 		public int mInsetL, mInsetT, mInsetR, mInsetB;
+		public int mWidth = -1;
+		public int mHeight = -1;
+		public int mGravity = 0;
 		public int mId;
 	}
 
