@@ -1,0 +1,164 @@
+name: Build Patched ATL Packages (Arch / CachyOS x86_64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+  schedule:
+    - cron: '0 3 * * 0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-x86_64:
+    name: Build Patched ATL & AUR Dependencies (x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Initialize Arch build environment, JDKs & Clone Fork
+        run: |
+          set -euo pipefail
+
+          pacman-key --init
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Syu --noconfirm --needed \
+            git sudo pacman-contrib github-cli jdk8-openjdk jdk21-openjdk sdl3
+
+          archlinux-java set java-8-openjdk
+          git config --global --add safe.directory '*'
+          git config --global protocol.file.allow always
+
+          # Optimize makepkg for CI (!debug !lto, all cores)
+          sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" /etc/makepkg.conf
+          sed -i "s/^MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" /etc/makepkg.conf
+          sed -i 's/\bdebug\b/!debug/g' /etc/makepkg.conf
+          sed -i 's/\blto\b/!lto/g' /etc/makepkg.conf
+          sed -i "s/^PKGEXT=.*/PKGEXT='.pkg.tar.zst'/" /etc/makepkg.conf
+
+          useradd -m -G wheel -s /bin/bash builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+          mkdir -p /tmp/prebuilt-pkgs
+          git clone --branch "${{ github.ref_name }}" "https://github.com/${{ github.repository }}.git" /tmp/forked-atl
+          echo "Fork commit count: $(git -C /tmp/forked-atl rev-list --count HEAD)"
+          cp /tmp/forked-atl/patches/art-ipv4-fixes.patch /tmp/art-ipv4-fixes.patch
+          chown -R builder:builder /tmp/prebuilt-pkgs /tmp/forked-atl /tmp/art-ipv4-fixes.patch
+
+      - name: Build AUR dependencies + Patched Fork of android_translation_layer-git
+        run: |
+          set -euo pipefail
+
+          su - builder -c '
+            set -euo pipefail
+            export _JAVA_OPTIONS="-Xmx4g"
+            git config --global protocol.file.allow always
+            mkdir -p ~/aur-build && cd ~/aur-build
+
+            PKGS=(
+              bsd-compat-headers
+              wolfssl-jni
+              bionic_translation-git
+              art_standalone-git
+              libopensles-standalone-git
+              android_translation_layer-git
+            )
+
+            for pkg in "${PKGS[@]}"; do
+              echo "============================================================"
+              echo ">>> Building package: ${pkg}"
+              echo "============================================================"
+              git clone "https://aur.archlinux.org/${pkg}.git"
+              pushd "${pkg}"
+
+              # Apply IPv4 fallback fix (GitLab #91) to art_standalone-git
+              if [ "${pkg}" = "art_standalone-git" ]; then
+                printf '\''\nprepare() {\n  cd "${_pkgname}"\n  git apply /tmp/art-ipv4-fixes.patch\n}\n'\'' >> PKGBUILD
+              fi
+
+              # Build android_translation_layer-git directly from our patched fork!
+              if [ "${pkg}" = "android_translation_layer-git" ]; then
+                sed -i "s|^source=.*|source=(\"android_translation_layer::git+file:///tmp/forked-atl\")|" PKGBUILD
+                sudo archlinux-java set java-21-openjdk
+              else
+                sudo archlinux-java set java-8-openjdk
+              fi
+
+              makepkg -s --noconfirm --nocheck --skippgpcheck --cleanbuild
+              sudo pacman -U --noconfirm ./*.pkg.tar.zst
+              cp -v ./*.pkg.tar.zst /tmp/prebuilt-pkgs/
+              popd
+            done
+          '
+
+      - name: Generate Pacman repository database (atl-prebuilt)
+        run: |
+          set -euo pipefail
+          cd /tmp/prebuilt-pkgs
+
+          repo-add atl-prebuilt.db.tar.gz ./*.pkg.tar.zst
+          rm -f atl-prebuilt.db atl-prebuilt.files
+          cp -f atl-prebuilt.db.tar.gz atl-prebuilt.db
+          cp -f atl-prebuilt.files.tar.gz atl-prebuilt.files
+          ls -lh /tmp/prebuilt-pkgs
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atl-arch-x86_64-packages
+          path: /tmp/prebuilt-pkgs/*
+          retention-days: 30
+
+      - name: Publish rolling 'latest' GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd /tmp/prebuilt-pkgs
+
+          BUILD_DATE="$(date -u +'%Y-%m-%d %H:%M UTC')"
+          cat <<EOF > /tmp/release-notes.md
+          Prebuilt **Patched Android Translation Layer (ATL)** + AUR dependencies for **Arch Linux / CachyOS (x86_64)**, built directly from this fork.
+
+          **Included Upstream Bugfixes:**
+          - **#100, #103, #104, #105:** Cleared pending JNI exceptions across all 20 C files + NULL string guards in \`WrapperWidget.c\`
+          - **#106:** Implemented \`TransitionListener\` callbacks & listener list in \`Transition.java\`
+          - **#102:** Implemented \`Icon.loadDrawable(Context)\` for bitmap, resource, and byte-array icons
+          - **#98, #99, #101:** Implemented \`Drawable\` ColorFilter storage and \`LayerDrawable\` size/gravity accessors
+          - **#91:** Applied \`art-ipv4-fixes.patch\` to \`art_standalone-git\` for IPv4-only Linux hosts
+          - **JDK 8 Compatibility:** Preserved Java 8 support in \`JNIUpcallWrapperGenerator.java\`
+
+          Built on: **${BUILD_DATE}**
+
+          ### Add as a Pacman Repo on CachyOS / Arch
+          Add to \`/etc/pacman.conf\`:
+          \`\`\`ini
+          [atl-prebuilt]
+          SigLevel = Optional TrustAll
+          Server = https://github.com/${{ github.repository }}/releases/download/latest
+          \`\`\`
+          Then install:
+          \`\`\`bash
+          sudo pacman -Syu android_translation_layer-git xdg-desktop-portal-gtk
+          \`\`\`
+          EOF
+          sed -i 's/^          //' /tmp/release-notes.md
+
+          if gh release view latest --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            OLD_ASSETS=$(gh release view latest --repo "${{ github.repository }}" --json assets -q '.assets[].name')
+            for asset in $OLD_ASSETS; do
+              gh release delete-asset latest "$asset" --repo "${{ github.repository }}" --yes || true
+            done
+            gh release edit latest --repo "${{ github.repository }}" --title "Patched ATL Prebuilt Packages (latest)" --notes-file /tmp/release-notes.md
+            gh release upload latest ./* --repo "${{ github.repository }}" --clobber
+          else
+            gh release create latest ./* \
+              --repo "${{ github.repository }}" \
+              --title "Patched ATL Prebuilt Packages (latest)" \
+              --notes-file /tmp/release-notes.md
+          fi
