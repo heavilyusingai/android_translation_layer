@@ -199,8 +199,8 @@ public class JNIUpcallWrapperGenerator {
 
 		if (destPath != null) {
 			out.close();
-			Path _destPath = Path.of(destPath);
-			if (Files.notExists(_destPath) || Files.mismatch(tempPath, _destPath) != -1)
+			Path _destPath = Paths.get(destPath);
+			if (Files.notExists(_destPath) || !java.util.Arrays.equals(Files.readAllBytes(tempPath), Files.readAllBytes(_destPath)))
 				Files.move(tempPath, _destPath, StandardCopyOption.REPLACE_EXISTING);
 		}
 	}
